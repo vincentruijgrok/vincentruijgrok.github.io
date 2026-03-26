@@ -110,13 +110,21 @@
       border: 1px solid var(--line);
       border-radius: 50%;
       position: relative;
+      transition: transform 120ms linear;
     }
 
-    .compass::before {
-      content: "N";
+    .north-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 0;
+      height: 0;
+      transform-origin: center;
+    }
+
+    .north-label span {
       position: absolute;
       top: 12px;
-      left: 50%;
       translate: -50% 0;
       color: var(--accent);
       font-size: 0.85rem;
@@ -272,6 +280,7 @@
     <section class="card">
       <div class="compass-wrap">
         <div class="compass" aria-hidden="true">
+          <div class="north-label" id="north-label"><span>N</span></div>
           <div class="arrow" id="arrow"></div>
         </div>
       </div>
@@ -312,6 +321,8 @@
     const els = {
       arrow: document.getElementById("arrow"),
       bearingText: document.getElementById("bearing-text"),
+      northLabel: document.getElementById("north-label"),
+      compass: document.querySelector(".compass"),
       list: document.getElementById("list"),
       nearest: document.getElementById("nearest"),
       compassButton: document.getElementById("compass-button"),
@@ -493,13 +504,16 @@
       const item = state.nearest;
       if (!item || !Number.isFinite(item.bearing)) {
         els.arrow.style.transform = "translateX(-50%) rotate(0deg)";
+        els.compass.style.transform = "rotate(0deg)";
+        els.northLabel.style.transform = "rotate(0deg)";
         els.bearingText.textContent = "Nog geen richting beschikbaar.";
         return;
       }
 
       const phoneHeading = Number.isFinite(state.heading) ? state.heading : 0;
-      const rotation = normalizeAngle(item.bearing - phoneHeading);
-      els.arrow.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+      els.compass.style.transform = `rotate(${-phoneHeading}deg)`;
+      els.arrow.style.transform = `translateX(-50%) rotate(${item.bearing}deg)`;
+      els.northLabel.style.transform = "rotate(0deg)";
       if (Number.isFinite(state.heading)) {
         els.bearingText.textContent = `${item.name} ligt ${compassDirection(item.bearing)} van je huidige positie.`;
       } else if (!els.compassButton.classList.contains("hidden")) {
