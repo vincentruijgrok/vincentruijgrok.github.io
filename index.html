@@ -251,6 +251,10 @@
     .hidden {
       display: none;
     }
+
+    .center {
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -272,6 +276,9 @@
         </div>
       </div>
       <p class="subtle" id="bearing-text">Nog geen richting beschikbaar.</p>
+      <div class="actions">
+        <button type="button" class="secondary hidden" id="compass-button">Activeer kompas</button>
+      </div>
     </section>
 
     <section class="card">
@@ -299,6 +306,7 @@
       userLocation: null,
       heading: null,
       nearest: null,
+      compassActive: false,
     };
 
     const els = {
@@ -306,17 +314,19 @@
       bearingText: document.getElementById("bearing-text"),
       list: document.getElementById("list"),
       nearest: document.getElementById("nearest"),
+      compassButton: document.getElementById("compass-button"),
       search: document.getElementById("search"),
       statusDot: document.getElementById("status-dot"),
       statusText: document.getElementById("status-text"),
     };
 
     els.search.addEventListener("input", render);
+    els.compassButton.addEventListener("click", requestCompass);
 
     init();
 
     async function init() {
-      await Promise.allSettled([requestLocation(), requestCompass()]);
+      await Promise.allSettled([requestLocation(), setupCompass()]);
       render();
     }
 
@@ -350,20 +360,53 @@
       });
     }
 
+    async function setupCompass() {
+      if (!window.DeviceOrientationEvent) {
+        els.bearingText.textContent = "Kompas wordt niet ondersteund op dit toestel.";
+        return;
+      }
+
+      if (typeof window.DeviceOrientationEvent.requestPermission === "function") {
+        els.compassButton.classList.remove("hidden");
+        els.bearingText.textContent = "Tik op 'Activeer kompas' om richting te tonen.";
+        return;
+      }
+
+      activateCompassListeners();
+      els.bearingText.textContent = "Wachten op kompasrichting...";
+    }
+
     async function requestCompass() {
-      if (window.DeviceOrientationEvent && typeof window.DeviceOrientationEvent.requestPermission === "function") {
+      if (!window.DeviceOrientationEvent) {
+        els.bearingText.textContent = "Kompas wordt niet ondersteund op dit toestel.";
+        return;
+      }
+
+      if (typeof window.DeviceOrientationEvent.requestPermission === "function") {
         try {
           const permission = await window.DeviceOrientationEvent.requestPermission();
           if (permission !== "granted") {
+            els.bearingText.textContent = "Kompasrechten zijn geweigerd.";
             return;
           }
         } catch {
+          els.bearingText.textContent = "Kompas kon niet worden geactiveerd.";
           return;
         }
       }
 
+      activateCompassListeners();
+      els.compassButton.classList.add("hidden");
+      els.bearingText.textContent = "Wachten op kompasrichting...";
+    }
+
+    function activateCompassListeners() {
+      if (state.compassActive) {
+        return;
+      }
       window.addEventListener("deviceorientationabsolute", onOrientation, true);
       window.addEventListener("deviceorientation", onOrientation, true);
+      state.compassActive = true;
     }
 
     function onOrientation(event) {
@@ -378,6 +421,7 @@
       }
 
       state.heading = normalizeAngle(heading);
+      els.compassButton.classList.add("hidden");
       updateCompass();
     }
 
@@ -456,7 +500,13 @@
       const phoneHeading = Number.isFinite(state.heading) ? state.heading : 0;
       const rotation = normalizeAngle(item.bearing - phoneHeading);
       els.arrow.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
-      els.bearingText.textContent = `${item.name} ligt ${compassDirection(item.bearing)} van je huidige positie.`;
+      if (Number.isFinite(state.heading)) {
+        els.bearingText.textContent = `${item.name} ligt ${compassDirection(item.bearing)} van je huidige positie.`;
+      } else if (!els.compassButton.classList.contains("hidden")) {
+        els.bearingText.textContent = "Tik op 'Activeer kompas' om richting te tonen.";
+      } else {
+        els.bearingText.textContent = "Wachten op kompasrichting...";
+      }
     }
 
     function withDistance(item) {
